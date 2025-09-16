@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # eMaamul Admin Panel
 
 A comprehensive admin web application for managing users and subscriptions in the eMaamul platform.
@@ -213,3 +214,6 @@ This project is licensed under the MIT License.
 ## Support
 
 For support and questions, please contact the development team.
+=======
+# admin
+>>>>>>> 5d34c19280ecd3f1a7cec38fee50079f7bb8d02e
