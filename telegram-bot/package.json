@@ -1,0 +1,27 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot with Mini App integration",
+  "main": "bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js",
+    "setup": "node setup-bot-commands.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "miniapp"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "socks-proxy-agent": "^8.0.5",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "dotenv": "^16.6.1",
+    "nodemon": "^3.0.1"
+  }
+}
