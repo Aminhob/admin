@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import { ThemeProvider as MuiThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
-import { createThemeByMode, ThemeSettings } from './index';
+import { ThemeProvider as MuiThemeProvider, CssBaseline, useMediaQuery, Theme } from '@mui/material';
+import { createThemeByMode } from './index';
+import type { ThemeSettings } from './index';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { APP_CONFIG } from '@/config/app';
-import { telegramWeb } from '@/lib/telegram';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -26,19 +25,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   children,
   defaultMode = 'system',
 }) => {
-  const [mode, setMode] = useLocalStorage<ThemeMode>('themeMode', defaultMode);
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  const [mode, setMode] = useLocalStorage<ThemeMode>('themeMode', defaultMode);
   const [isMounted, setIsMounted] = useState(false);
+  
+  const isDark = mode === 'system' ? prefersDarkMode : mode === 'dark';
+  const effectiveMode = isDark ? 'dark' : 'light';
 
-  // Get the effective theme mode (resolving 'system' to either 'light' or 'dark')
-  const effectiveMode: 'light' | 'dark' = useMemo(() => {
-    if (mode === 'system') {
-      return prefersDarkMode ? 'dark' : 'light';
-    }
-    return mode;
-  }, [mode, prefersDarkMode]);
-
-  // Create the theme based on the effective mode
   const theme = useMemo(() => {
     return createThemeByMode(effectiveMode);
   }, [effectiveMode]);
@@ -55,36 +48,47 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 
   // Apply theme to document and handle Telegram theme changes
   useEffect(() => {
-    // Apply theme class to document
+    // Set document theme attribute for CSS theming
     document.documentElement.setAttribute('data-theme', effectiveMode);
     
-    // Set theme color meta tag for mobile browsers
-    const themeColor = effectiveMode === 'dark' ? '#121212' : '#ffffff';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
-    
-    // Handle Telegram theme changes if in Telegram WebApp
-    if (telegramWeb.isTelegramWebApp()) {
-      const handleThemeChange = () => {
-        const tgTheme = telegramWeb.getTheme();
-        setMode(tgTheme);
-      };
-      
-      // Set initial theme from Telegram
-      const tgTheme = telegramWeb.getTheme();
-      if (tgTheme !== effectiveMode) {
-        setMode(tgTheme);
-      }
-      
-      // Listen for theme changes
-      // Note: You'll need to implement the actual event listener in the Telegram WebApp
-      // This is a simplified version
-      window.addEventListener('themeChanged', handleThemeChange);
-      
-      return () => {
-        window.removeEventListener('themeChanged', handleThemeChange);
-      };
+    // Set meta theme color
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', isDark ? '#121212' : '#ffffff');
     }
-  }, [effectiveMode, setMode]);
+
+    // Handle Telegram theme changes if in Telegram WebApp
+    if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+      const webApp = (window as any).Telegram.WebApp;
+      
+      try {
+        if (webApp.setHeaderColor) {
+          webApp.setHeaderColor(isDark ? 'secondary_bg_color' : 'bg_color');
+        }
+        if (webApp.setBackgroundColor) {
+          webApp.setBackgroundColor(isDark ? '#1a1a1a' : '#ffffff');
+        }
+        
+        // Set up theme change handler
+        const handleThemeChange = () => {
+          if (webApp) {
+            const isDarkMode = webApp.colorScheme === 'dark';
+            setMode(isDarkMode ? 'dark' : 'light');
+          }
+        };
+
+        // Listen for theme changes
+        webApp.onEvent('themeChanged', handleThemeChange);
+
+        // Cleanup
+        return () => {
+          webApp.offEvent('themeChanged', handleThemeChange);
+        };
+      } catch (error) {
+        console.error('Error initializing Telegram WebApp theme:', error);
+      }
+    }
+  }, [effectiveMode, isDark, setMode]);
 
   // Mark as mounted after first render to avoid hydration issues
   useEffect(() => {
@@ -99,7 +103,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   const contextValue = {
     mode,
     theme,
-    isDark: effectiveMode === 'dark',
+    isDark,
     toggleTheme,
     setThemeMode,
   };
@@ -107,7 +111,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   return (
     <ThemeContext.Provider value={contextValue}>
       <MuiThemeProvider theme={theme}>
-        <CssBaseline />
+        <CssBaseline enableColorScheme />
         {children}
       </MuiThemeProvider>
     </ThemeContext.Provider>

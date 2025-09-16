@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # eMaamul Admin Panel
 
 A comprehensive admin web application for managing users and subscriptions in the eMaamul platform.
