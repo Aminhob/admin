@@ -127,7 +127,7 @@ export const apiRequest = async <T = any>(
     if (error instanceof ApiError) {
       errorMessage = error.message;
       status = error.status;
-    } else if (error.name === 'AbortError') {
+    } else if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
       errorMessage = 'Request was cancelled';
       status = 0;
     } else if (error instanceof TypeError) {
@@ -191,8 +191,7 @@ export const api = {
       headers: {
         ...options.headers,
         // Let the browser set the content type with the correct boundary
-        'Content-Type': undefined,
-      },
+      } as Record<string, string>,
     });
   },
 };

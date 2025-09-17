@@ -1,4 +1,4 @@
-import { createTheme, ThemeOptions } from '@mui/material/styles';
+import { createTheme, ThemeOptions, Theme } from '@mui/material/styles';
 
 // Extend the Theme and ThemeOptions interfaces
 declare module '@mui/material/styles' {
@@ -20,6 +20,19 @@ declare module '@mui/material/styles' {
     };
   }
 }
+
+// This type is also defined in ThemeProvider.tsx
+export type AppTheme = Theme & {
+  custom: {
+    main: string;
+    light: string;
+    dark: string;
+    contrastText: string;
+  };
+};
+
+// Re-export the Theme type for convenience
+export type { Theme };
 
 // Base theme options
 const baseTheme: ThemeOptions = {
@@ -206,7 +219,7 @@ export const darkTheme = createTheme({
 });
 
 // Create theme based on mode
-export const createThemeByMode = (mode: 'light' | 'dark' = 'light') => {
+export function createThemeByMode(mode: 'light' | 'dark' = 'light'): AppTheme {
   return mode === 'dark' ? darkTheme : lightTheme;
 };
 

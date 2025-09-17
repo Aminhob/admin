@@ -1,26 +1,37 @@
-import { useForm as useReactHookForm, UseFormReturn, FieldValues, SubmitHandler, UseFormProps } from 'react-hook-form';
+import { 
+  useForm as useReactHookForm, 
+  UseFormReturn, 
+  FieldValues, 
+  SubmitHandler, 
+  UseFormProps, 
+  FieldError, 
+  Control,
+  Resolver,
+  FieldErrorsImpl,
+  Merge,
+  DeepRequired
+} from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z, ZodType } from 'zod';
+import { z } from 'zod';
 import { toast } from 'react-hot-toast';
 
 // Define the type for form errors
 type FormErrors<T extends FieldValues> = {
-  [K in keyof T]?: {
-    message?: string;
-  };
+  [K in keyof T]?: FieldError | Merge<FieldError, FieldErrorsImpl<DeepRequired<T>[K]>>;
 };
 
 // Define the type for the useForm hook return value
-export type UseFormReturnType<T extends FieldValues> = UseFormReturn<T> & {
+export type UseFormReturnType<T extends FieldValues> = Omit<UseFormReturn<T>, 'handleSubmit' | 'formState' | 'control'> & {
   errors: FormErrors<T>;
   handleSubmit: (onValid: SubmitHandler<T>) => (e?: React.BaseSyntheticEvent) => Promise<void>;
   isSubmitting: boolean;
   resetForm: () => void;
+  control: Control<T>;
 };
 
 // Define the options for the useForm hook
 type UseFormOptions<T extends FieldValues> = Omit<UseFormProps<T>, 'resolver'> & {
-  schema?: ZodType<T>;
+  schema?: z.ZodType<any>;
   defaultValues?: Partial<T>;
   onSuccess?: (data: T) => void | Promise<void>;
   onError?: (errors: FormErrors<T>) => void | Promise<void>;
@@ -39,41 +50,43 @@ export const useForm = <T extends FieldValues>({
   successMessage,
   ...formOptions
 }: UseFormOptions<T> = {}): UseFormReturnType<T> => {
+  const formProps: UseFormProps<T> = {
+    defaultValues: defaultValues as any,
+    ...formOptions,
+  };
+
+  if (schema) {
+    formProps.resolver = zodResolver(schema as any) as Resolver<T>;
+  }
+
   const {
     control,
     handleSubmit: rhfHandleSubmit,
     formState: { errors, isSubmitting },
     reset,
     ...formMethods
-  } = useReactHookForm<T>({
-    resolver: schema ? zodResolver(schema) : undefined,
-    defaultValues: defaultValues as any,
-    ...formOptions,
-  });
+  } = useReactHookForm<T>(formProps);
 
-  // Format errors to match the FormErrors type
-  const formattedErrors = Object.keys(errors).reduce<FormErrors<T>>((acc, key) => {
-    const error = errors[key];
-    if (error) {
-      acc[key as keyof T] = {
-        message: error.message as string,
-      };
+  // Format errors to match our FormErrors type
+  const formattedErrors = Object.entries(errors).reduce<FormErrors<T>>((acc, [key, value]) => {
+    if (value) {
+      acc[key as keyof T] = value as any;
     }
     return acc;
-  }, {});
+  }, {} as FormErrors<T>);
 
   // Handle form submission with error handling and success/error toasts
   const handleSubmit = (onValid: SubmitHandler<T>) => {
     return rhfHandleSubmit(async (data, event) => {
       try {
-        await onValid(data, event);
+        await onValid(data as T, event);
         
         if (successMessage) {
           toast.success(successMessage);
         }
         
         if (onSuccess) {
-          await onSuccess(data);
+          await onSuccess(data as T);
         }
       } catch (error) {
         console.error('Form submission error:', error);
@@ -83,7 +96,13 @@ export const useForm = <T extends FieldValues>({
         toast.error(errorMessage);
         
         if (onError) {
-          await onError(formattedErrors);
+          const fieldErrors = Object.entries(errors).reduce((acc, [key, value]) => {
+            if (value) {
+              acc[key as keyof T] = value as FieldError;
+            }
+            return acc;
+          }, {} as FormErrors<T>);
+          await onError(fieldErrors);
         }
       }
     });
@@ -95,19 +114,19 @@ export const useForm = <T extends FieldValues>({
   };
 
   return {
-    control,
+    ...formMethods,
+    control: control as Control<T>,
     handleSubmit,
     errors: formattedErrors,
     isSubmitting,
     reset: resetForm,
     resetForm,
-    ...formMethods,
-  };
+  } as UseFormReturnType<T>;
 };
 
 // Re-export useful types and utilities from react-hook-form
 export { Controller } from 'react-hook-form';
-export type { FieldError, Control, UseFormSetValue, UseFormWatch } from 'react-hook-form';
+export type { FieldError, Control, FieldValues } from 'react-hook-form';
 
 // Helper function to create form schemas with Zod
 export const createFormSchema = <T extends z.ZodRawShape>(schema: T) => {
@@ -146,15 +165,19 @@ export const validationSchemas = {
 // Helper function to get error message for a field
 export const getErrorMessage = <T extends FieldValues>(
   errors: FormErrors<T>,
-  fieldName: keyof T,
+  fieldName: keyof T
 ): string | undefined => {
-  return errors[fieldName]?.message;
+  const error = errors[fieldName];
+  if (!error) return undefined;
+  if (typeof error === 'string') return error;
+  if (error.message) return String(error.message);
+  return undefined;
 };
 
 // Helper function to check if a field has an error
 export const hasError = <T extends FieldValues>(
   errors: FormErrors<T>,
-  fieldName: keyof T,
+  fieldName: keyof T
 ): boolean => {
   return !!errors[fieldName];
 };

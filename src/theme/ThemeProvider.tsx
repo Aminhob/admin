@@ -1,14 +1,24 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import { ThemeProvider as MuiThemeProvider, CssBaseline, useMediaQuery, Theme } from '@mui/material';
-import { createThemeByMode } from './index';
-import type { ThemeSettings } from './index';
+import { ThemeProvider as MuiThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
+import { createThemeByMode } from './theme';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import type { Theme } from '@mui/material/styles';
+
+// Define the AppTheme type
+type AppTheme = Theme & {
+  custom: {
+    main: string;
+    light: string;
+    dark: string;
+    contrastText: string;
+  };
+};
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
 type ThemeContextType = {
   mode: ThemeMode;
-  theme: ThemeSettings;
+  theme: AppTheme;
   isDark: boolean;
   toggleTheme: () => void;
   setThemeMode: (mode: ThemeMode) => void;
@@ -32,7 +42,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   const isDark = mode === 'system' ? prefersDarkMode : mode === 'dark';
   const effectiveMode = isDark ? 'dark' : 'light';
 
-  const theme = useMemo(() => {
+  const theme = useMemo<AppTheme>(() => {
     return createThemeByMode(effectiveMode);
   }, [effectiveMode]);
 
